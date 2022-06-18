@@ -5,8 +5,10 @@
 #include <string.h>
 
 #include <string.hpp>
-#include <psp_elf.hpp>
+#include <file_stream.hpp>
+#include <memory_stream.hpp>
 
+#include "decompiler.hpp"
 #include "config.hpp"
 
 struct arguments
@@ -124,10 +126,26 @@ try
         throw std::runtime_error("could not open input file");
 
     in.calculate_size();
-    
-    // do_the_thing(&in, &log, args);
+    memory_stream in_buf = memory_stream(in.size());
+    in.read_at(in_buf.data(), 0, in.size());
 
     in.close();
+
+    FILE *outfd = stdout;
+
+    if (!args.output_file.empty())
+        outfd = fopen(args.output_file.c_str(), "w");
+
+    file_stream out(outfd);
+
+    decompile_conf dconf;
+    dconf.in = &in_buf;
+    dconf.log = &log;
+    dconf.verbose = args.verbose;
+    
+    decompile_allegrex(&dconf, &out);
+
+    out.close();
     return 0;
 }
 catch (std::runtime_error &e)
