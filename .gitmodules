@@ -1,0 +1,3 @@
+[submodule "liballegrex"]
+	path = liballegrex
+	url = https://github.com/DaemonTsun/liballegrex
