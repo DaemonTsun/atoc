@@ -1,7 +1,67 @@
 
+#include <string.h>
+
+#include <algorithm>
+#include <vector>
+
 #include <psp_elf.hpp>
+#include <internal/psp_module_function_pspdev_headers.hpp>
 #include <parse_instructions.hpp>
 #include "decompiler.hpp"
+
+void disassemble_sections(const decompile_conf *conf, elf_parse_data *epdata, jump_destination_array *jumps, std::vector<parse_data> *pdatas)
+{
+    pdatas->resize(epdata->sections.size());
+
+    for (int i = 0; i < epdata->sections.size(); ++i)
+    {
+        elf_section *sec = &epdata->sections[i];
+
+        parse_config pconf;
+        pconf.log = conf->log;
+        pconf.vaddr = sec->vaddr;
+        pconf.verbose = conf->verbose;
+        pconf.emit_pseudo = true;
+
+        parse_data *pdata = &pdatas->at(i);
+        pdata->jump_destinations = jumps;
+        parse_allegrex(&sec->content, &pconf, pdata);
+    }
+}
+
+void get_module_headers(const elf_parse_data *epdata, std::vector<const char*> *out)
+{
+    out->clear();
+
+    for (const auto &mod : epdata->imported_modules)
+    for (const auto &mfunc : mod.functions)
+    {
+        const psp_function *func = mfunc.function;
+
+        if (func->header_file == nullptr
+         || strcmp(func->header_file, unknown_header) == 0)
+            continue;
+
+        const char *header = strstr(func->header_file, "/");
+
+        if (header == nullptr)
+            header = func->header_file;
+        else
+            header++; // move after the /
+
+        out->push_back(header);
+    }
+
+    std::sort(out->begin(), out->end());
+    out->erase(std::unique(out->begin(), out->end()), out->end());
+    out->shrink_to_fit();
+}
+
+void output_header_files(const std::vector<const char*> *header_files, file_stream *out)
+{
+    for (const char *header : *header_files)
+        printf("#include <%s>\n", header);
+}
 
 void decompile_allegrex(const decompile_conf *conf, file_stream *out)
 {
@@ -15,22 +75,13 @@ void decompile_allegrex(const decompile_conf *conf, file_stream *out)
     read_elf(conf->in, &rconf, &epdata);
 
     jump_destination_array jumps;
-
     std::vector<parse_data> pdatas;
-    pdatas.resize(epdata.sections.size());
+    disassemble_sections(conf, &epdata, &jumps, &pdatas);
 
-    for (int i = 0; i < epdata.sections.size(); ++i)
-    {
-        elf_section *sec = &epdata.sections[i];
+    std::vector<const char*> header_files;
+    get_module_headers(&epdata, &header_files);
 
-        parse_config pconf;
-        pconf.log = conf->log;
-        pconf.vaddr = sec->vaddr;
-        pconf.verbose = conf->verbose;
-        pconf.emit_pseudo = true;
-
-        parse_data *pdata = &pdatas[i];
-        pdata->jump_destinations = &jumps;
-        parse_allegrex(&sec->content, &pconf, pdata);
-    }
+    // ----- output -----
+    // TODO: move to own file
+    output_header_files(&header_files, out);
 }
