@@ -8,6 +8,8 @@
 #include <file_stream.hpp>
 #include <memory_stream.hpp>
 
+#include "decompile_format.hpp"
+#include "decompile_data.hpp"
 #include "decompiler.hpp"
 #include "config.hpp"
 
@@ -143,7 +145,14 @@ try
     dconf.log = &log;
     dconf.verbose = args.verbose;
     
-    decompile_allegrex(&dconf, &out);
+    decompile_data ddata;
+    decompile_allegrex(&dconf, &ddata);
+
+    decompile_format_config dfconf;
+    dfconf.log = &log;
+    dfconf.verbose = args.verbose;
+    dfconf.data = &ddata;
+    decompile_format(&dfconf, &out);
 
     out.close();
     return 0;

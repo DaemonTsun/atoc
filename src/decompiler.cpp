@@ -57,13 +57,7 @@ void get_module_headers(const elf_parse_data *epdata, std::vector<const char*> *
     out->shrink_to_fit();
 }
 
-void output_header_files(const std::vector<const char*> *header_files, file_stream *out)
-{
-    for (const char *header : *header_files)
-        printf("#include <%s>\n", header);
-}
-
-void decompile_allegrex(const decompile_conf *conf, file_stream *out)
+void decompile_allegrex(const decompile_conf *conf, decompile_data *out)
 {
     psp_elf_read_config rconf;
     rconf.log = conf->log;
@@ -78,10 +72,5 @@ void decompile_allegrex(const decompile_conf *conf, file_stream *out)
     std::vector<parse_data> pdatas;
     disassemble_sections(conf, &epdata, &jumps, &pdatas);
 
-    std::vector<const char*> header_files;
-    get_module_headers(&epdata, &header_files);
-
-    // ----- output -----
-    // TODO: move to own file
-    output_header_files(&header_files, out);
+    get_module_headers(&epdata, &out->header_files);
 }
